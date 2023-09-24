@@ -10,6 +10,9 @@ from torch.utils.data import TensorDataset, DataLoader
 import module.model as M
 from module.evaluation import log_metrics, FocalLoss
 from module.preprocessing import get_data, tokenize_conversation
+from utils import logger
+import time
+
 
 os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 
@@ -55,6 +58,17 @@ class LearningEnv:
         self.data_label = data_label
 
         self.best_performance = [0, 0, 0]  # p, r, f1
+        
+        self.exp_path="/output/tf_dir"
+        
+        now = time.strftime("%m-%d_%H-%M", time.localtime())
+
+        self.exp_name=now
+        
+        self.pwd = os.path.split(os.path.realpath(__file__))[0]
+
+        self.writer, self.log_txt = logger(self.exp_path, self.exp_name, self.pwd, 'exp', resume=False)
+
 
     def __set_model__(
         self,
@@ -341,12 +355,14 @@ class LearningEnv:
 
                 loss_avg += loss.item()
                 count += 1
+#                 debug
+                p_cau, r_cau, f1_cau = log_metrics(self,i,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
 
             loss_avg = loss_avg / count
 
             # Logging Performance
             if allocated_gpu == 0:
-                p_cau, r_cau, f1_cau = log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
+                p_cau, r_cau, f1_cau = log_metrics(self,i,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
             self.valid(allocated_gpu, batch_size, num_worker, saver)
             
             if not self.single_gpu:
@@ -465,7 +481,7 @@ class LearningEnv:
             loss_avg = loss_avg / count
 
             if allocated_gpu == 0:
-                p_cau, r_cau, f1_cau = log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
+                p_cau, r_cau, f1_cau = log_metrics(self,0,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
             del valid_dataloader
 
             if option == 'valid' and allocated_gpu == 0:

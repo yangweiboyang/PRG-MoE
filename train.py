@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--contain_context', help='While tokenizing, previous utterances are contained or not', default=False)
 
     parser.add_argument('--training_iter', default=40, type=int)
-    parser.add_argument('--batch_size', default=5, type=int)
+    parser.add_argument('--batch_size', default=4, type=int)
     parser.add_argument('--learning_rate', default=5e-5, type=float)
     parser.add_argument('--patience', help='patience for Early Stopping', default=None, type=int)
 

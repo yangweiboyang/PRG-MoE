@@ -48,12 +48,18 @@ def metrics_report_for_emo_binary(pred_y, true_y, get_dict=False, multilabel=Fal
     else:
         return classification_report(true_y, pred_y, target_names=class_name, zero_division=0, digits=4)
 
-def log_metrics(logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause, option='train'):
+def log_metrics(self,cur_epoch,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause, option='train'):
     label_ = np.array(['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'])
     logger.info('\n' + metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_))
     report_dict = metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_, get_dict=True)
     acc_emo, p_emo, r_emo, f1_emo = report_dict['accuracy'], report_dict['weighted avg']['precision'], report_dict['weighted avg']['recall'], report_dict['weighted avg']['f1-score']
     logger.info(f'\nemotion: {option} | loss {loss_avg}\n')
+    self.writer.add_scalar('loss_avg', loss_avg,cur_epoch)
+    # self.writer.add_scalar('p_emo', p_emo,cur_epoch)
+    # self.writer.add_scalar('r_emo', r_emo,cur_epoch)
+    # self.writer.add_scalar('f1_emo', f1_emo,cur_epoch)
+
+
 
     logger.info('\n' + metrics_report_for_emo_binary(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list)))
     report_dict = metrics_report_for_emo_binary(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), get_dict=True)
