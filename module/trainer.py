@@ -58,8 +58,10 @@ class LearningEnv:
         self.data_label = data_label
 
         self.best_performance = [0, 0, 0]  # p, r, f1
+
+        self.best_emotion_performance =[0,0,0]
         
-        self.exp_path="/output/tf_dir"
+        self.exp_path="./tf_dir"
         
         now = time.strftime("%m-%d_%H-%M", time.localtime())
 
@@ -355,14 +357,14 @@ class LearningEnv:
 
                 loss_avg += loss.item()
                 count += 1
-#                 debug
-                p_cau, r_cau, f1_cau = log_metrics(self,i,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
 
             loss_avg = loss_avg / count
 
             # Logging Performance
+            self.writer.add_scalar('loss/train/loss_avg', loss_avg,i)
+
             if allocated_gpu == 0:
-                p_cau, r_cau, f1_cau = log_metrics(self,i,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
+                p_cau, r_cau, f1_cau,_,_,_ = log_metrics(self,i,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
             self.valid(allocated_gpu, batch_size, num_worker, saver)
             
             if not self.single_gpu:
@@ -417,7 +419,7 @@ class LearningEnv:
             self.distributed_model.eval()
             loss_avg, count= 0, 0
             emo_pred_y_list, emo_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, cau_pred_y_list, cau_true_y_list = [list() for _ in range(6)]
-
+            iter=0
             for utterance_input_ids_batch, utterance_attention_mask_batch, utterance_token_type_ids_batch, speaker_batch, emotion_label_batch, pair_cause_label_batch, pair_binary_cause_label_batch in tqdm(valid_dataloader, desc=f"{option}"):
                 batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
 
@@ -477,11 +479,12 @@ class LearningEnv:
 
                 loss_avg += loss.item()
                 count += 1
+                iter+=1
 
             loss_avg = loss_avg / count
 
             if allocated_gpu == 0:
-                p_cau, r_cau, f1_cau = log_metrics(self,0,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
+                p_cau, r_cau, f1_cau, p_emo, r_emo, f1_emo = log_metrics(self,iter,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
             del valid_dataloader
 
             if option == 'valid' and allocated_gpu == 0:
@@ -496,6 +499,12 @@ class LearningEnv:
                 
                 p, r, f1 = self.best_performance
                 logger.info(f'\n[current best performance] precision: {p} | recall: {r} | f1-score: {f1}\n')
+
+                if self.best_emotion_performance[-1] < f1_emo:
+                    self.best_emotion_performance = [p_emo, r_emo, f1_emo]
+                
+                p_emo, r_emo, f1_emo = self.best_emotion_performance
+                logger.info(f'\n[current best emotion performance] precision: {p_emo} | recall: {r_emo} | f1-score: {f1_emo}\n')
 
     def run(self, **kwargs):
         self.multiprocess_work(**kwargs)
