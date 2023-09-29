@@ -34,6 +34,9 @@ class GuidedMoEBasic(nn.Module):
                                      attention_mask=attention_mask.view(-1, max_seq_len),
                                      token_type_ids=token_type_ids.view(-1, max_seq_len),
                                      return_dict=False)
+        for name,param in self.bert.named_parameters():
+            param.requires_grad = False
+            
         utterance_representation = self.dropout(pooled_output)
         return self.emotion_linear(utterance_representation)
 
@@ -60,6 +63,8 @@ class GuidedMoEBasic(nn.Module):
         batch_size, max_doc_len, max_seq_len = input_ids.shape
 
         _, pooled_output = self.bert(input_ids=input_ids.view(-1, max_seq_len), attention_mask=attention_mask.view(-1, max_seq_len), token_type_ids=token_type_ids.view(-1, max_seq_len), return_dict=False)
+        for name,param in self.bert.named_parameters():
+            param.requires_grad = False
         utterance_representation = self.dropout(pooled_output)
         
         concatenated_embedding = torch.cat((utterance_representation, emotion_prediction, speaker_ids.view(-1).unsqueeze(1)), dim=1) # 여기서 emotion_prediction에 detach를 해야 문제가 안생기겠지? 해보고 문제생기면 detach 고고

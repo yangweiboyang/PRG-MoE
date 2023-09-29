@@ -93,7 +93,7 @@ class LearningEnv:
             "n_expert": n_expert,
             "guiding_lambda": guiding_lambda,
         }
-
+        # print("**********************line96:",pretrained_model)
         if pretrained_model is not None:
             model = getattr(M, self.model_name)(**model_args)
             model.load_state_dict(torch.load(pretrained_model))
@@ -122,7 +122,6 @@ class LearningEnv:
         c=torch.rand(1,31,75).to(torch.int64).cuda()
         d=torch.rand(1,31).to(torch.int64).cuda()
         
-        # self.writer.add_graph(model,((a,b,c,d),c,d))
         self.writer.add_graph(model,(a,b,c,d))
 
 
@@ -281,7 +280,8 @@ class LearningEnv:
             self.init_stopper()
             logger = logging.getLogger('train')
 
-        optimizer = optim.Adam(self.distributed_model.parameters(), lr=learning_rate)
+        # optimizer = optim.Adam(self.distributed_model.parameters(), lr=learning_rate)
+        optimizer= optim.Adam(filter(lambda p: p.requires_grad, self.distributed_model.parameters(),lr=learning_rate))
 
         if self.n_cause == 2:
             model_name_suffix = 'binary_cause'
