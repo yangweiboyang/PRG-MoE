@@ -1,3 +1,4 @@
 transformers==4.30.2
 torch-geometric==2.3.1
 tensorboardX
+torch-summary
