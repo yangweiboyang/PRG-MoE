@@ -114,6 +114,17 @@ class LearningEnv:
         torch.cuda.set_device(allocated_gpu)
 
         model = self.__set_model__(**self.options).cuda(allocated_gpu)
+        # print(model)
+        # [1,31,75],[1,31,75],[1,31,75],[1,31]
+
+        a=torch.rand(1,31,75).to(torch.int64).cuda()
+        b=torch.rand(1,31,75).to(torch.int64).cuda()
+        c=torch.rand(1,31,75).to(torch.int64).cuda()
+        d=torch.rand(1,31).to(torch.int64).cuda()
+        
+        # self.writer.add_graph(model,((a,b,c,d),c,d))
+        self.writer.add_graph(model,(a,b,c,d))
+
 
         if self.single_gpu:
             self.distributed_model = model
@@ -287,7 +298,8 @@ class LearningEnv:
                                                 verbose=False)
 
         train_dataloader = self.get_dataloader(self.train_dataset, batch_size, num_worker)
-
+        loss_emo=0
+        loss_cau=0
         for i in range(training_iter):
             self.distributed_model.train()
             
@@ -298,13 +310,15 @@ class LearningEnv:
                 batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
                 
                 check_pad_idx = get_pad_idx(utterance_input_ids_batch)
-
+                # [1,31,75],[1,31,75],[1,31,75],[1,31]
                 prediction = self.distributed_model(
                                                     utterance_input_ids_batch, 
                                                     utterance_attention_mask_batch, 
                                                     utterance_token_type_ids_batch, 
                                                     speaker_batch
                                                     )
+                print("***************",utterance_input_ids_batch.shape,utterance_attention_mask_batch.shape,\
+                      utterance_token_type_ids_batch.shape,speaker_batch.shape)
 
                 if len(prediction) != 2:
                     emotion_prediction, binary_cause_prediction = prediction
@@ -357,6 +371,10 @@ class LearningEnv:
 
                 loss_avg += loss.item()
                 count += 1
+
+            self.writer.add_scalar('loss/train/loss_emo', loss_emo,count)
+            self.writer.add_scalar('loss/train/loss_cau', loss_cau,count)
+            self.writer.add_scalar('loss/train/loss', loss_avg,count) 
 
             loss_avg = loss_avg / count
 
@@ -480,6 +498,9 @@ class LearningEnv:
                 loss_avg += loss.item()
                 count += 1
                 iter+=1
+            self.writer.add_scalar('loss/%s/loss_emo'%option, loss_emo,iter)
+            self.writer.add_scalar('loss/%s/loss_cau'%option, loss_cau,iter)
+            self.writer.add_scalar('loss/%s/loss'%option, loss_avg,iter) 
 
             loss_avg = loss_avg / count
 

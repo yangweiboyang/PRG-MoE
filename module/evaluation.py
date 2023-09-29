@@ -53,10 +53,8 @@ def log_metrics(self,cur_epoch,logger, emo_pred_y_list, emo_true_y_list, cau_pre
     logger.info('\n' + metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_))
     report_dict = metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_, get_dict=True)
     acc_emo, p_emo, r_emo, f1_emo = report_dict['accuracy'], report_dict['weighted avg']['precision'], report_dict['weighted avg']['recall'], report_dict['weighted avg']['f1-score']
-    logger.info(f'\nemotion: {option} | loss {loss_avg}\n')
+    # logger.info(f'\nemotion: {option} | loss {loss_avg}\n')
     logger.info(f'\nemotion: accuracy: {acc_emo} | precision: {p_emo} | recall: {r_emo} | f1-score: {f1_emo}\n')
-
-    self.writer.add_scalar('loss/%s/Emotion_loss_avg'%option, loss_avg,cur_epoch)
 
     self.writer.add_scalar('Emotion Extraction/acc_emo', acc_emo,cur_epoch)
     self.writer.add_scalar('Emotion Extraction/p_emo', p_emo,cur_epoch)
@@ -85,7 +83,6 @@ def log_metrics(self,cur_epoch,logger, emo_pred_y_list, emo_true_y_list, cau_pre
         self.writer.add_scalar('Emotion-Cause Pair Extraction/p_cau(precision)', p_cau,cur_epoch)
         self.writer.add_scalar('Emotion-Cause Pair Extraction/r_cau(recall)', r_cau,cur_epoch)
         self.writer.add_scalar('Emotion-Cause Pair Extraction/f1_cau(f1_score)', f1_cau,cur_epoch)
-        self.writer.add_scalar('loss/%s/Cause_loss_avg'%option, loss_avg,cur_epoch)
 
 
     else:
