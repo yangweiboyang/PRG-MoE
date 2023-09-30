@@ -280,8 +280,8 @@ class LearningEnv:
             self.init_stopper()
             logger = logging.getLogger('train')
 
-        # optimizer = optim.Adam(self.distributed_model.parameters(), lr=learning_rate)
-        optimizer= optim.Adam(filter(lambda p: p.requires_grad, self.distributed_model.parameters(),lr=learning_rate))
+        optimizer = optim.Adam(self.distributed_model.parameters(), lr=learning_rate)
+        # optimizer= optim.Adam(filter(lambda p: p.requires_grad, self.distributed_model.parameters()),lr=learning_rate)
 
         if self.n_cause == 2:
             model_name_suffix = 'binary_cause'
@@ -317,8 +317,8 @@ class LearningEnv:
                                                     utterance_token_type_ids_batch, 
                                                     speaker_batch
                                                     )
-                print("***************",utterance_input_ids_batch.shape,utterance_attention_mask_batch.shape,\
-                      utterance_token_type_ids_batch.shape,speaker_batch.shape)
+                # print("***************",utterance_input_ids_batch.shape,utterance_attention_mask_batch.shape,\
+                    #   utterance_token_type_ids_batch.shape,speaker_batch.shape)
 
                 if len(prediction) != 2:
                     emotion_prediction, binary_cause_prediction = prediction
