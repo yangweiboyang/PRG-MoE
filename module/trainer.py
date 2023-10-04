@@ -301,6 +301,7 @@ class LearningEnv:
         loss_emo=0
         loss_cau=0
         for i in range(training_iter):
+            epoch_num=i
             self.distributed_model.train()
             
             loss_avg, count= 0, 0
@@ -372,17 +373,17 @@ class LearningEnv:
                 loss_avg += loss.item()
                 count += 1
 
-            self.writer.add_scalar('loss/train/loss_emo', loss_emo,count)
-            self.writer.add_scalar('loss/train/loss_cau', loss_cau,count)
-            self.writer.add_scalar('loss/train/loss', loss_avg,count) 
+ 
 
             loss_avg = loss_avg / count
+            self.writer.add_scalar('loss/train/loss_emo', loss_emo,epoch_num)
+            self.writer.add_scalar('loss/train/loss_cau', loss_cau,epoch_num)
+            self.writer.add_scalar('loss/train/loss_avg', loss_avg,epoch_num)
 
             # Logging Performance
-            self.writer.add_scalar('loss/train/loss_avg', loss_avg,i)
 
             if allocated_gpu == 0:
-                p_cau, r_cau, f1_cau,_,_,_ = log_metrics(self,i,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
+                p_cau, r_cau, f1_cau,_,_,_ = log_metrics(self,epoch_num,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
             self.valid(allocated_gpu, batch_size, num_worker, saver)
             
             if not self.single_gpu:
@@ -395,7 +396,7 @@ class LearningEnv:
             
             scheduler.step()
 
-    def valid(self, allocated_gpu, batch_size, num_worker, saver=None, option='valid'):
+    def valid(self, allocated_gpu, batch_size, num_worker, epoch_num=0,saver=None, option='valid'):
         def get_pad_idx(utterance_input_ids_batch):
             batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
             check_pad_idx = torch.sum(utterance_input_ids_batch.view(-1, max_seq_len)[:, 2:], dim=1).cpu()
@@ -498,14 +499,15 @@ class LearningEnv:
                 loss_avg += loss.item()
                 count += 1
                 iter+=1
-            self.writer.add_scalar('loss/%s/loss_emo'%option, loss_emo,iter)
-            self.writer.add_scalar('loss/%s/loss_cau'%option, loss_cau,iter)
-            self.writer.add_scalar('loss/%s/loss'%option, loss_avg,iter) 
+
 
             loss_avg = loss_avg / count
+            self.writer.add_scalar('loss/%s/loss_emo'%option, loss_emo,epoch_num)
+            self.writer.add_scalar('loss/%s/loss_cau'%option, loss_cau,epoch_num)
+            self.writer.add_scalar('loss/%s/loss'%option, loss_avg,epoch_num) 
 
             if allocated_gpu == 0:
-                p_cau, r_cau, f1_cau, p_emo, r_emo, f1_emo = log_metrics(self,iter,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
+                p_cau, r_cau, f1_cau, p_emo, r_emo, f1_emo = log_metrics(self,epoch_num,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option=option)
             del valid_dataloader
 
             if option == 'valid' and allocated_gpu == 0:

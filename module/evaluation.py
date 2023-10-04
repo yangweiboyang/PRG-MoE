@@ -56,10 +56,10 @@ def log_metrics(self,cur_epoch,logger, emo_pred_y_list, emo_true_y_list, cau_pre
     # logger.info(f'\nemotion: {option} | loss {loss_avg}\n')
     logger.info(f'\nemotion: accuracy: {acc_emo} | precision: {p_emo} | recall: {r_emo} | f1-score: {f1_emo}\n')
 
-    self.writer.add_scalar('Emotion Extraction/acc_emo', acc_emo,cur_epoch)
-    self.writer.add_scalar('Emotion Extraction/p_emo', p_emo,cur_epoch)
-    self.writer.add_scalar('Emotion Extraction/r_emo', r_emo,cur_epoch)
-    self.writer.add_scalar('Emotion Extraction/f1_emo', f1_emo,cur_epoch)
+    # self.writer.add_scalar('Emotion Extraction/acc_emo', acc_emo,cur_epoch)
+    # self.writer.add_scalar('Emotion Extraction/p_emo', p_emo,cur_epoch)
+    # self.writer.add_scalar('Emotion Extraction/r_emo', r_emo,cur_epoch)
+    # self.writer.add_scalar('Emotion Extraction/f1_emo', f1_emo,cur_epoch)
 
 
     logger.info('\n' + metrics_report_for_emo_binary(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list)))
