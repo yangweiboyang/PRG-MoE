@@ -250,151 +250,6 @@ class LearningEnv:
             torch.distributed.barrier()
 
 
-    def train2(self, allocated_gpu, training_iter, batch_size, learning_rate, patience, num_worker):
-        def get_pad_idx(utterance_input_ids_batch):
-            batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
-            check_pad_idx = torch.sum(utterance_input_ids_batch.view(-1, max_seq_len)[:, 2:], dim=1).cpu()
-
-            return check_pad_idx
-
-        def get_pair_pad_idx(utterance_input_ids_batch, window_constraint=3, emotion_pred=None):
-            batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
-            
-            check_pad_idx = get_pad_idx(utterance_input_ids_batch)
-
-            if emotion_pred is not None:
-                emotion_pred = torch.argmax(emotion_pred, dim=1)
-                
-            check_pair_window_idx = list()
-            for batch in check_pad_idx.view(-1, max_doc_len):
-                pair_window_idx = torch.zeros(int(max_doc_len * (max_doc_len + 1) / 2))
-                for end_t in range(1, len(batch.nonzero()) + 1):
-                    if emotion_pred is not None and emotion_pred[end_t - 1] == 6:
-                        continue
-                    
-                    pair_window_idx[max(0, int((end_t - 1) * end_t / 2), int(end_t * (end_t + 1) / 2) - window_constraint):int(end_t * (end_t + 1) / 2)] = 1
-                check_pair_window_idx.append(pair_window_idx)
-            
-            return torch.stack(check_pair_window_idx)
-
-        if allocated_gpu == 0:
-            self.init_stopper()
-            logger = logging.getLogger('train')
-
-        optimizer = optim.Adam(self.distributed_model.parameters(), lr=learning_rate)
-        # optimizer= optim.Adam(filter(lambda p: p.requires_grad, self.distributed_model.parameters()),lr=learning_rate)
-
-        if self.n_cause == 2:
-            model_name_suffix = 'binary_cause'
-        else:
-            model_name_suffix = 'multiclass_cause'
-
-        if not os.path.exists("model/"):
-            os.makedirs("model/")
-        saver = ModelSaver(path=f"model/{self.model_name}-{model_name_suffix}-{self.data_label}-{self.start_time}.pt", single_gpu=self.single_gpu)
-
-        scheduler = optim.lr_scheduler.LambdaLR(optimizer=optimizer,
-                                                lr_lambda=lambda epoch: 0.95 ** epoch,
-                                                last_epoch=-1,
-                                                verbose=False)
-
-        train_dataloader = self.get_dataloader(self.train_dataset, batch_size, num_worker)
-        loss_emo=0
-        loss_cau=0
-        for i in range(training_iter):
-            self.distributed_model.train()
-            
-            loss_avg, count= 0, 0
-            emo_pred_y_list, emo_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, cau_pred_y_list, cau_true_y_list = [list() for _ in range(6)]
-
-            for utterance_input_ids_batch, utterance_attention_mask_batch, utterance_token_type_ids_batch, speaker_batch, emotion_label_batch, pair_cause_label_batch, pair_binary_cause_label_batch in tqdm(train_dataloader, desc=f"Train | Epoch {i+1}"):
-                batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
-                
-                check_pad_idx = get_pad_idx(utterance_input_ids_batch)
-                # [1,31,75],[1,31,75],[1,31,75],[1,31]
-                prediction = self.distributed_model(
-                                                    utterance_input_ids_batch, 
-                                                    utterance_attention_mask_batch, 
-                                                    utterance_token_type_ids_batch, 
-                                                    speaker_batch
-                                                    )
-                # print("***************",utterance_input_ids_batch.shape,utterance_attention_mask_batch.shape,\
-                    #   utterance_token_type_ids_batch.shape,speaker_batch.shape)
-
-                if len(prediction) != 2:
-                    emotion_prediction, binary_cause_prediction = prediction
-                else:
-                    emotion_prediction, binary_cause_prediction = prediction
-                
-                check_pair_window_idx = get_pair_pad_idx(
-                                                        utterance_input_ids_batch, 
-                                                        window_constraint=3, 
-                                                        emotion_pred=emotion_prediction
-                                                        )
-                check_pair_pad_idx = get_pair_pad_idx(
-                                                    utterance_input_ids_batch, 
-                                                    window_constraint=1000
-                                                    )
-
-                emotion_prediction = emotion_prediction[(check_pad_idx != False).nonzero(as_tuple=True)]
-                binary_cause_prediction_window = binary_cause_prediction.view(batch_size, -1, self.n_cause)[(check_pair_window_idx != False).nonzero(as_tuple=True)]
-                binary_cause_prediction_all = binary_cause_prediction.view(batch_size, -1, self.n_cause)[(check_pair_pad_idx != False).nonzero(as_tuple=True)]
-                
-                emotion_label_batch = emotion_label_batch.view(-1)[(check_pad_idx != False).nonzero(as_tuple=True)]
-
-                if self.n_cause == 2:
-                    pair_binary_cause_label_batch_window = pair_binary_cause_label_batch[(check_pair_window_idx != False).nonzero(as_tuple=True)]
-                    pair_binary_cause_label_batch_all = pair_binary_cause_label_batch[(check_pair_pad_idx != False).nonzero(as_tuple=True)]
-                else:
-                    pair_cause_label_batch = torch.argmax(pair_cause_label_batch.view(-1, self.n_cause), dim=1).view(batch_size, -1)
-
-                    pair_binary_cause_label_batch_window = pair_cause_label_batch[(check_pair_window_idx != False).nonzero(as_tuple=True)]
-                    pair_binary_cause_label_batch_all = pair_cause_label_batch[(check_pair_pad_idx != False).nonzero(as_tuple=True)]
-
-                criterion_emo = FocalLoss(gamma=2)
-                criterion_cau = FocalLoss(gamma=2)
-
-                loss_emo = criterion_emo(emotion_prediction, emotion_label_batch.to(allocated_gpu))
-                
-                if torch.sum(check_pair_window_idx) == 0:
-                    loss = loss_emo
-                else:
-                    loss_cau = criterion_cau(binary_cause_prediction_window, pair_binary_cause_label_batch_window.to(allocated_gpu))
-                    loss = 0.2 * loss_emo + 0.8 * loss_cau
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                cau_pred_y_list_all.append(binary_cause_prediction_all), cau_true_y_list_all.append(pair_binary_cause_label_batch_all)
-                cau_pred_y_list.append(binary_cause_prediction_window), cau_true_y_list.append(pair_binary_cause_label_batch_window)
-                emo_pred_y_list.append(emotion_prediction), emo_true_y_list.append(emotion_label_batch)
-
-                loss_avg += loss.item()
-                count += 1
-
-            self.writer.add_scalar('loss/train/loss_emo', loss_emo,count)
-            self.writer.add_scalar('loss/train/loss_cau', loss_cau,count)
-            self.writer.add_scalar('loss/train/loss', loss_avg,count) 
-
-            loss_avg = loss_avg / count
-
-            # Logging Performance
-            self.writer.add_scalar('loss/train/loss_avg', loss_avg,i)
-
-            if allocated_gpu == 0:
-                p_cau, r_cau, f1_cau,_,_,_ = log_metrics(self,i,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
-            self.valid(allocated_gpu, batch_size, num_worker, saver)
-            
-            if not self.single_gpu:
-                torch.distributed.barrier()
-
-            self.valid(allocated_gpu, batch_size, num_worker, saver, option='test')
-
-            if self.stopper or (i == training_iter - 1):
-                return
-            
-            scheduler.step()
 
     def train(self, allocated_gpu, training_iter, batch_size, learning_rate, patience, num_worker):
         def get_pad_idx(utterance_input_ids_batch):
@@ -518,19 +373,19 @@ class LearningEnv:
                 loss_avg += loss.item()
                 count += 1
 
-            self.writer.add_scalar('loss/train/loss_emo', loss_emo,epoch_num)
-            self.writer.add_scalar('loss/train/loss_cau', loss_cau,epoch_num)
-            self.writer.add_scalar('loss/train/loss', loss_avg,epoch_num) 
+
 
             loss_avg = loss_avg / count
+            
+            self.writer.add_scalar('loss/train/loss_emo', loss_emo,epoch_num)
+            self.writer.add_scalar('loss/train/loss_cau', loss_cau,epoch_num)
+            self.writer.add_scalar('loss/train/loss_avg', loss_avg,epoch_num) 
             
             ece_label_list = np.concatenate(ece_label_list)
             ece_prediction = np.concatenate(ece_prediction_list)
             ece_prediction_mask = np.concatenate(ece_prediction_mask)            
 
             # Logging Performance
-            self.writer.add_scalar('loss/train/loss_avg', loss_avg,epoch_num)
-
             if allocated_gpu == 0:
                 f1_cau,cause_reports,emo_reports  = log_metrics(self,epoch_num,logger, emo_pred_y_list, emo_true_y_list, \
                                                                           loss_avg,ece_label_list,ece_prediction,
@@ -540,7 +395,7 @@ class LearningEnv:
             if not self.single_gpu:
                 torch.distributed.barrier()
 
-            self.valid(allocated_gpu, batch_size, num_worker, count,saver, option='test')
+            self.valid(allocated_gpu, batch_size, num_worker, epoch_num,saver, option='test')
 
             if self.stopper or (i == training_iter - 1):
                 return
@@ -651,11 +506,13 @@ class LearningEnv:
 
                 loss_avg += loss.item()
                 count += 1
-            self.writer.add_scalar('loss/%s/loss_emo'%option, loss_emo,epoch_num)
-            self.writer.add_scalar('loss/%s/loss_cau'%option, loss_cau,epoch_num)
-            self.writer.add_scalar('loss/%s/loss'%option, loss_avg,epoch_num) 
+
 
             loss_avg = loss_avg / count
+            
+            self.writer.add_scalar('loss/%s/loss_emo'%option, loss_emo,epoch_num)
+            self.writer.add_scalar('loss/%s/loss_cau'%option, loss_cau,epoch_num)
+            self.writer.add_scalar('loss/%s/loss_avg'%option, loss_avg,epoch_num) 
             
             ece_label_list = np.concatenate(ece_label_list)
             ece_prediction = np.concatenate(ece_prediction_list)
@@ -678,8 +535,6 @@ class LearningEnv:
                     self.best_performance=f1_cau
                     self.best_cau_report=cause_reports
                 
-                # p, r, f1 = self.best_performance
-                # logger.info(f'\n[current best performance] precision: {p} | recall: {r} | f1-score: {f1}\n')
                 logger.info('\n[current best cause reports]\n'+self.best_cau_report)
 
                 

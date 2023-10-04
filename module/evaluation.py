@@ -48,75 +48,10 @@ def metrics_report_for_emo_binary(pred_y, true_y, get_dict=False, multilabel=Fal
     else:
         return classification_report(true_y, pred_y, target_names=class_name, zero_division=0, digits=4)
 
-def log_metrics2(self,cur_epoch,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause, option='train'):
-    label_ = np.array(['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'])
-    logger.info('\n' + metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_))
-    report_dict = metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_, get_dict=True)
-    acc_emo, p_emo, r_emo, f1_emo = report_dict['accuracy'], report_dict['weighted avg']['precision'], report_dict['weighted avg']['recall'], report_dict['weighted avg']['f1-score']
-    # logger.info(f'\nemotion: {option} | loss {loss_avg}\n')
-    logger.info(f'\nemotion: accuracy: {acc_emo} | precision: {p_emo} | recall: {r_emo} | f1-score: {f1_emo}\n')
-
-    self.writer.add_scalar('Emotion Extraction/acc_emo', acc_emo,cur_epoch)
-    self.writer.add_scalar('Emotion Extraction/p_emo', p_emo,cur_epoch)
-    self.writer.add_scalar('Emotion Extraction/r_emo', r_emo,cur_epoch)
-    self.writer.add_scalar('Emotion Extraction/f1_emo', f1_emo,cur_epoch)
-
-
-    logger.info('\n' + metrics_report_for_emo_binary(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list)))
-    report_dict = metrics_report_for_emo_binary(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), get_dict=True)
-    acc_emo, p_emo, r_emo, f1_emo = report_dict['accuracy'], report_dict['weighted avg']['precision'], report_dict['weighted avg']['recall'], report_dict['weighted avg']['f1-score']
-    logger.info(f'\nemotion (binary): {option} | loss {loss_avg}\n')
-
-    if n_cause == 2:
-        label_ = np.array(['No Cause', 'Cause'])
-
-        report_dict = metrics_report(torch.cat(cau_pred_y_list), torch.cat(cau_true_y_list), label=label_, get_dict=True)
-        _, p_cau, _, _ = report_dict['accuracy'], report_dict['Cause']['precision'], report_dict['Cause']['recall'], report_dict['Cause']['f1-score']
-
-        report_dict = metrics_report(torch.cat(cau_pred_y_list_all), torch.cat(cau_true_y_list_all), label=label_, get_dict=True)
-        acc_cau, _, r_cau, _ = report_dict['accuracy'], report_dict['Cause']['precision'], report_dict['Cause']['recall'], report_dict['Cause']['f1-score']
-
-        f1_cau = 2 * p_cau * r_cau / (p_cau + r_cau) if p_cau + r_cau != 0 else 0
-        logger.info(f'\nbinary_cause: {option} | loss {loss_avg}\n')
-        logger.info(f'\nbinary_cause: accuracy: {acc_cau} | precision: {p_cau} | recall: {r_cau} | f1-score: {f1_cau}\n')
-        self.writer.add_scalar('Emotion-Cause Pair Extraction/acc_cau', acc_cau,cur_epoch)
-        self.writer.add_scalar('Emotion-Cause Pair Extraction/p_cau(precision)', p_cau,cur_epoch)
-        self.writer.add_scalar('Emotion-Cause Pair Extraction/r_cau(recall)', r_cau,cur_epoch)
-        self.writer.add_scalar('Emotion-Cause Pair Extraction/f1_cau(f1_score)', f1_cau,cur_epoch)
-
-
-    else:
-        label_ = np.array(['no-context', 'inter-personal', 'self-contagion', 'no cause'])
-        report_dict = metrics_report(torch.cat(cau_pred_y_list), torch.cat(cau_true_y_list), label=label_, get_dict=True)
-
-        p_no_context, p_inter_personal, p_self_contagion = report_dict['no-context']['precision'], report_dict['inter-personal']['precision'], report_dict['self-contagion']['precision']
-
-        p_cau = (report_dict['no-context']['support'] * report_dict['no-context']['precision'] + report_dict['inter-personal']['support'] * report_dict['inter-personal']['precision'] + report_dict['self-contagion']['support'] * report_dict['self-contagion']['precision']) / \
-                (report_dict['no-context']['support'] + report_dict['inter-personal']['support'] + report_dict['self-contagion']['support'] )
-
-        report_dict = metrics_report(torch.cat(cau_pred_y_list_all), torch.cat(cau_true_y_list_all), label=label_, get_dict=True)
-
-        r_no_context, r_inter_personal, r_self_contagion = report_dict['no-context']['recall'], report_dict['inter-personal']['recall'], report_dict['self-contagion']['recall']
-
-        acc_cau = report_dict['accuracy']
-        r_cau = (report_dict['no-context']['support'] * report_dict['no-context']['recall'] + report_dict['inter-personal']['support'] * report_dict['inter-personal']['recall'] + report_dict['self-contagion']['support'] * report_dict['self-contagion']['recall']) / \
-                (report_dict['no-context']['support'] + report_dict['inter-personal']['support'] + report_dict['self-contagion']['support'] )
-
-        f1_cau = 2 * p_cau * r_cau / (p_cau + r_cau) if p_cau + r_cau != 0 else 0
-        logger.info(f'\nmulticlass_cause: {option} | loss {loss_avg}\n')
-
-        logger.info(f'\nmulticlass_cause: no-context    | precision: {p_no_context} | recall: {r_no_context} | f1-score: {2 * p_no_context * r_no_context / (p_no_context + r_no_context) if p_no_context + r_no_context != 0 else 0}\n')
-        logger.info(f'multiclass_cause: inter-personal  | precision: {p_inter_personal} | recall: {r_inter_personal} | f1-score: {2 * p_inter_personal * r_inter_personal / (p_inter_personal + r_inter_personal) if p_inter_personal + r_inter_personal != 0 else 0}\n')
-        logger.info(f'multiclass_cause: self-contagion  | precision: {p_self_contagion} | recall: {r_self_contagion} | f1-score: {2 * p_self_contagion * r_self_contagion / (p_self_contagion + r_self_contagion) if p_self_contagion + r_self_contagion != 0 else 0}\n')
-
-        logger.info(f'\nmulticlass_cause: accuracy: {acc_cau} | precision: {p_cau} | recall: {r_cau} | f1-score: {f1_cau}\n')
-
-    return p_cau, r_cau, f1_cau,p_emo, r_emo, f1_emo
-
 def log_metrics(self,cur_epoch,logger, emo_pred_y_list, emo_true_y_list , loss_avg, ece_label_list,ece_prediction,ece_prediction_mask,n_cause,option='train'):
     # 情感
     label_ = np.array(['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'])
-    logger.info('\n******emotion_reports******' + metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_))
+    logger.info('\n[emotion_reports]\n' + metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_))
     report_dict = metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_, get_dict=True)
     acc_emo, p_emo, r_emo, f1_emo = report_dict['accuracy'], report_dict['weighted avg']['precision'], report_dict['weighted avg']['recall'], report_dict['weighted avg']['f1-score']
     # logger.info(f'\nemotion: {option} | loss {loss_avg}\n')
@@ -139,7 +74,7 @@ def log_metrics(self,cur_epoch,logger, emo_pred_y_list, emo_true_y_list , loss_a
                                     digits=4)
 
     # print(cause_reports)
-    logger.info('\n*******cause_reports******'+cause_reports)
+    logger.info('\n[cause_reports]\n'+cause_reports)
 
 
 
