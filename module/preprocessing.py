@@ -24,15 +24,26 @@ def get_data(data_file, device, max_seq_len, contain_context=False):
 
 
     doc_speaker, doc_emotion_label, doc_pair_cause_label, doc_pair_binary_cause_label = [list() for _ in range(4)]
-
+    doc_mask=[]
+    doc_evidence=[]
     for doc_id, content in data.items():
         speaker, emotion_label, corresponding_cause_turn, corresponding_cause_span, corresponding_cause_label = [list() for _ in range(5)]
         content = content[0]
 
         pair_cause_label = torch.zeros((int(max_doc_len * (max_doc_len + 1) / 2), 4), dtype=torch.long) 
         pair_binary_cause_label = torch.zeros(int(max_doc_len * (max_doc_len + 1) / 2), dtype=torch.long)
-
+        
+        evi=[]
         for turn_data in content:
+            if 'expanded emotion cause evidence' in turn_data:
+                ev = turn_data['expanded emotion cause evidence']
+            else:
+                ev = []
+            ev_vic = [0] * len(content)
+            for i in ev:
+                if i != 'b':
+                    ev_vic[i - 1] = 1
+            evi.append(ev_vic)
             speaker.append(0 if turn_data["speaker"] == "A" else 1)
 
             emotion_label.append(emotion_label_policy[turn_data["emotion"]])
@@ -74,6 +85,12 @@ def get_data(data_file, device, max_seq_len, contain_context=False):
         doc_pair_cause_label.append(pair_cause_label)
         doc_pair_binary_cause_label.append(pair_binary_cause_label)
         
+        evi = torch.tensor(evi, dtype=torch.long)
+        doc_evidence.append(evi)
+        msk = torch.ones_like(evi, dtype=torch.long).tril(0)
+        doc_mask.append(msk)
+        
+        
     out_speaker, out_emotion_label = [list() for _ in range(2)]
     out_pair_cause_label, out_pair_binary_cause_label = torch.stack(doc_pair_cause_label), torch.stack(doc_pair_binary_cause_label)
 
@@ -85,10 +102,18 @@ def get_data(data_file, device, max_seq_len, contain_context=False):
         emotion_label_t[:len(speaker)] = torch.tensor(emotion_label)
 
         out_speaker.append(speaker_t); out_emotion_label.append(emotion_label_t)
+    
+    # ?max_len是否有错误
+    max_len=max_doc_len
+    doc_mask = [torch.cat([torch.cat([m, torch.zeros(max_len-m.shape[0], m.shape[1])], dim=0), torch.zeros(max_len, max_len-m.shape[1])], dim=1) for m in doc_mask]
+    out_mask = torch.stack(doc_mask, dim=0) 
+    
+    ece_pair = [torch.cat([torch.cat([ep, torch.zeros(max_len-ep.shape[0], ep.shape[1])], dim=0), torch.zeros(max_len, max_len-ep.shape[1])], dim=1) for ep in doc_evidence]
+    out_ece_pair = torch.stack(ece_pair, dim=0)   
 
     out_speaker, out_emotion_label = torch.stack(out_speaker).type(torch.FloatTensor), torch.stack(out_emotion_label)
-
-    return preprocessed_utterance, out_speaker.to(device), out_emotion_label.to(device), out_pair_cause_label.to(device), out_pair_binary_cause_label.to(device)
+    # print("line111:",out_speaker.shape,out_mask.shape)
+    return preprocessed_utterance, out_speaker.to(device), out_emotion_label.to(device), out_pair_cause_label.to(device), out_pair_binary_cause_label.to(device),out_mask.to(device),out_ece_pair.to(device)
 
 def load_utterance(data_file, device, max_seq_len):
     f = open(data_file)
