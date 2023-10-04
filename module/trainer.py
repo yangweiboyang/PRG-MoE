@@ -387,7 +387,7 @@ class LearningEnv:
 
             # Logging Performance
             if allocated_gpu == 0:
-                f1_cau,cause_reports,emo_reports  = log_metrics(self,epoch_num,logger, emo_pred_y_list, emo_true_y_list, \
+                f1_cau,cause_reports,emo_reports  = log_metrics(epoch_num,logger, emo_pred_y_list, emo_true_y_list, \
                                                                           loss_avg,ece_label_list,ece_prediction,
                                                                           ece_prediction_mask, n_cause=self.n_cause, option='train')
             self.valid(allocated_gpu, batch_size, num_worker, epoch_num,saver)
@@ -402,7 +402,7 @@ class LearningEnv:
             epoch_num+=1
             scheduler.step()
             
-    def valid(self, allocated_gpu, batch_size, num_worker, epoch_num,saver=None, option='valid'):
+    def valid(self, allocated_gpu, batch_size, num_worker, epoch_num=0,saver=None, option='valid'):
         def get_pad_idx(utterance_input_ids_batch):
             batch_size, max_doc_len, max_seq_len = utterance_input_ids_batch.shape
             check_pad_idx = torch.sum(utterance_input_ids_batch.view(-1, max_seq_len)[:, 2:], dim=1).cpu()
@@ -519,7 +519,7 @@ class LearningEnv:
             ece_prediction_mask = np.concatenate(ece_prediction_mask)
 
             if allocated_gpu == 0:
-                f1_cau,cause_reports,emo_reports  = log_metrics(self,epoch_num,logger, emo_pred_y_list, emo_true_y_list, \
+                f1_cau,cause_reports,emo_reports  = log_metrics(epoch_num,logger, emo_pred_y_list, emo_true_y_list, \
                                                                           loss_avg,ece_label_list,ece_prediction,
                                                                           ece_prediction_mask, n_cause=self.n_cause, option=option)
             del valid_dataloader

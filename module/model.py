@@ -28,15 +28,9 @@ class GuidedMoEBasic(nn.Module):
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward2(self, input_ids, attention_mask, token_type_ids, speaker_ids):
-        emotion_pred = self.emotion_classification_task(input_ids, attention_mask, token_type_ids)
-        cause_pred = self.binary_cause_classification_task(emotion_pred, input_ids, attention_mask, token_type_ids, speaker_ids)
-
-        return emotion_pred, cause_pred
     
     def forward(self, input_ids, attention_mask, token_type_ids, speaker_ids,mask_ids):
         emotion_pred = self.emotion_classification_task(input_ids, attention_mask, token_type_ids)
-        # mask=torch.ones(batch_size,dim,dim)
 
         logits=self.get_pair_embedding(emotion_pred, input_ids, attention_mask, token_type_ids, speaker_ids,mask_ids)
         return emotion_pred,logits
@@ -115,20 +109,18 @@ class GuidedMoEBasic(nn.Module):
         #
         # dim=rel_emb_k.shape[-1]
         # mask=torch.ones(batch_size,dim,dim)
-        # print("*************line117:",mask_ids.shape)
         # logits.shape [batch_size,31,31]
         logits = self.classifier(utter_emb,rel_emb_k,rel_emb_v,mask_ids)
-        # print("logits.shape",utter_emb.shape,rel_emb_k.shape,rel_emb_v.shape,mask_ids.shape)
         
-        pair_embedding = list()
-        for batch in concatenated_embedding.view(batch_size, max_doc_len, -1):
-            pair_per_batch = list()
-            for end_t in range(max_doc_len):
-                for t in range(end_t + 1):
-                    pair_per_batch.append(torch.cat((batch[t], batch[end_t]))) # backward 시, cycle이 생겨 문제가 생길 경우, batch[end_t].detach() 시도.
-            pair_embedding.append(torch.stack(pair_per_batch))
+        # pair_embedding = list()
+        # for batch in concatenated_embedding.view(batch_size, max_doc_len, -1):
+        #     pair_per_batch = list()
+        #     for end_t in range(max_doc_len):
+        #         for t in range(end_t + 1):
+        #             pair_per_batch.append(torch.cat((batch[t], batch[end_t]))) # backward 시, cycle이 생겨 문제가 생길 경우, batch[end_t].detach() 시도.
+        #     pair_embedding.append(torch.stack(pair_per_batch))
         
-        pair_embedding = torch.stack(pair_embedding).to(input_ids.device)
+        # pair_embedding = torch.stack(pair_embedding).to(input_ids.device)
 
         return logits    
 

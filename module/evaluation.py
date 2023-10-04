@@ -48,10 +48,10 @@ def metrics_report_for_emo_binary(pred_y, true_y, get_dict=False, multilabel=Fal
     else:
         return classification_report(true_y, pred_y, target_names=class_name, zero_division=0, digits=4)
 
-def log_metrics(self,cur_epoch,logger, emo_pred_y_list, emo_true_y_list , loss_avg, ece_label_list,ece_prediction,ece_prediction_mask,n_cause,option='train'):
+def log_metrics(epoch_num,logger, emo_pred_y_list, emo_true_y_list , loss_avg, ece_label_list,ece_prediction,ece_prediction_mask,n_cause,option='train'):
     # 情感
     label_ = np.array(['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'])
-    logger.info('\n[emotion_reports]\n' + metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_))
+    logger.info('\n[emotion_reports]\n' +'epoch:'+epoch_num+ metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_))
     report_dict = metrics_report(torch.cat(emo_pred_y_list), torch.cat(emo_true_y_list), label=label_, get_dict=True)
     acc_emo, p_emo, r_emo, f1_emo = report_dict['accuracy'], report_dict['weighted avg']['precision'], report_dict['weighted avg']['recall'], report_dict['weighted avg']['f1-score']
     # logger.info(f'\nemotion: {option} | loss {loss_avg}\n')
@@ -74,7 +74,7 @@ def log_metrics(self,cur_epoch,logger, emo_pred_y_list, emo_true_y_list , loss_a
                                     digits=4)
 
     # print(cause_reports)
-    logger.info('\n[cause_reports]\n'+cause_reports)
+    logger.info('\n[cause_reports]\n'+'epoch:'+epoch_num+cause_reports)
 
 
 
