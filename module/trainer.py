@@ -240,7 +240,7 @@ class LearningEnv:
 
 
         if test:
-            self.valid(allocated_gpu, batch_size, num_worker, saver=None, option='test')
+            self.valid(allocated_gpu, batch_size, num_worker, epoch_num,saver=None, option='test')
         else:
             self.train(allocated_gpu, training_iter, batch_size, learning_rate, patience, num_worker)
             self.valid(allocated_gpu, batch_size, num_worker, saver=None, option='test')
@@ -384,12 +384,12 @@ class LearningEnv:
 
             if allocated_gpu == 0:
                 p_cau, r_cau, f1_cau,_,_,_ = log_metrics(self,epoch_num,logger, emo_pred_y_list, emo_true_y_list, cau_pred_y_list, cau_true_y_list, cau_pred_y_list_all, cau_true_y_list_all, loss_avg, n_cause=self.n_cause, option='train')
-            self.valid(allocated_gpu, batch_size, num_worker, saver)
+            self.valid(allocated_gpu, batch_size, num_worker, epoch_num,saver)
             
             if not self.single_gpu:
                 torch.distributed.barrier()
 
-            self.valid(allocated_gpu, batch_size, num_worker, saver, option='test')
+            self.valid(allocated_gpu, batch_size, num_worker, epoch_num,saver, option='test')
 
             if self.stopper or (i == training_iter - 1):
                 return
